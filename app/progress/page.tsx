@@ -1,9 +1,10 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Download, Trophy, Target, Clock, Search } from "lucide-react"
+import { Download, Trophy, Target, Clock, Search, TrendingUp, Activity } from "lucide-react"
 import {
   LineChart,
   Line,
@@ -21,90 +22,132 @@ import {
 } from "recharts"
 import WellnessNavbar from "@/components/wellness-navbar"
 import { Progress } from "@/components/ui/progress"
+import { useRouter } from "next/navigation"
 
-const progressData = [
-  { date: "Week 1", energy: 40, mood: 35, sleep: 50, stress: 80 },
-  { date: "Week 2", energy: 45, mood: 42, sleep: 55, stress: 75 },
-  { date: "Week 3", energy: 52, mood: 48, sleep: 62, stress: 68 },
-  { date: "Week 4", energy: 58, mood: 55, sleep: 68, stress: 60 },
-  { date: "Week 5", energy: 65, mood: 62, sleep: 72, stress: 55 },
-  { date: "Week 6", energy: 70, mood: 68, sleep: 78, stress: 50 },
-  { date: "Week 7", energy: 75, mood: 72, sleep: 82, stress: 45 },
-  { date: "Week 8", energy: 80, mood: 78, sleep: 85, stress: 40 },
-]
+interface WeeklyTrend {
+  date: string
+  weekNumber: number
+  energy: number
+  mood: number
+  sleep: number
+  stress: number
+  exercises: number
+  analyses: number
+}
 
-const currentWeekData = [
-  { subject: "Energy", A: 80, fullMark: 100 },
-  { subject: "Mood", A: 78, fullMark: 100 },
-  { subject: "Sleep", A: 85, fullMark: 100 },
-  { subject: "Stress", A: 40, fullMark: 100 },
-  { subject: "Focus", A: 75, fullMark: 100 },
-  { subject: "Motivation", A: 82, fullMark: 100 },
-]
+interface HealthSnapshot {
+  subject: string
+  A: number
+  fullMark: number
+}
 
-const achievements = [
-  {
-    title: "7-Day Streak",
-    description: "Completed symptom tracking for 7 consecutive days",
-    icon: "🔥",
-    date: "2 days ago",
-    color: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-200",
-  },
-  {
-    title: "Stress Reducer",
-    description: "Reduced stress levels by 50% over 8 weeks",
-    icon: "🧘",
-    date: "1 week ago",
-    color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200",
-  },
-  {
-    title: "Sleep Champion",
-    description: "Improved sleep quality by 70%",
-    icon: "😴",
-    date: "3 days ago",
-    color: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200",
-  },
-  {
-    title: "Energy Booster",
-    description: "Doubled energy levels from baseline",
-    icon: "⚡",
-    date: "5 days ago",
-    color: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-200",
-  },
-]
+interface Achievement {
+  title: string
+  description: string
+  icon: string
+  date: string
+  color: string
+}
 
-const goals = [
-  {
-    title: "Reduce Stress to 30%",
-    current: 40,
-    target: 30,
-    progress: 75,
-    color: "bg-gradient-to-r from-pink-400 to-pink-500",
-  },
-  {
-    title: "Increase Energy to 90%",
-    current: 80,
-    target: 90,
-    progress: 89,
-    color: "bg-gradient-to-r from-purple-400 to-purple-500",
-  },
-  {
-    title: "Maintain Sleep at 85%+",
-    current: 85,
-    target: 85,
-    progress: 100,
-    color: "bg-gradient-to-r from-indigo-400 to-indigo-500",
-  },
-  {
-    title: "Improve Mood to 85%",
-    current: 78,
-    target: 85,
-    progress: 92,
-    color: "bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400",
-  },
-]
+interface Goal {
+  title: string
+  current: number
+  target: number
+  progress: number
+  color: string
+}
+
+interface ProgressData {
+  weeklyTrends: WeeklyTrend[]
+  healthSnapshot: HealthSnapshot[]
+  achievements: Achievement[]
+  goals: Goal[]
+  exerciseStats: {
+    totalSessions: number
+    totalMinutes: number
+    totalHours: number
+    averageDuration: number
+    weeklyAverage: number
+    favoriteExercise: string | null
+  }
+  engagement: {
+    activitiesLast7Days: number
+    activitiesLast30Days: number
+    loginsLast7Days: number
+    loginsLast30Days: number
+    averageDailyActivities: number
+    averageDailyLogins: number
+  }
+  summary: {
+    totalExercises: number
+    totalAnalyses: number
+    totalPeriods: number
+    totalLogins: number
+    memberSince: string
+    daysActive: number
+  }
+}
 
 export default function ProgressPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [progressData, setProgressData] = useState<ProgressData | null>(null)
+
+  useEffect(() => {
+    fetchProgressData()
+  }, [])
+
+  const fetchProgressData = async () => {
+    try {
+      const response = await fetch('/api/progress/overview', {
+        credentials: 'include'
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success) {
+          setProgressData(result.data)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching progress data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleExportReport = async () => {
+    try {
+      const res = await fetch("/api/report/progress-pdf", {
+        method: "GET",
+        credentials: "include",
+      })
+      if (!res.ok) {
+        const errorText = await res.text()
+        console.error("Failed to generate PDF:", errorText)
+        alert("Failed to generate PDF report. Please try again.")
+        return
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `progress_report_${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error("Error downloading PDF:", err)
+      alert("Network error while downloading PDF. Please check your connection.")
+    }
+  }
+
+  // Use real data or fallback to empty/default data
+  const weeklyTrends = progressData?.weeklyTrends || []
+  const healthSnapshot = progressData?.healthSnapshot || []
+  const achievements = progressData?.achievements || []
+  const goals = progressData?.goals || []
   return (
     <>
       <WellnessNavbar />
@@ -129,103 +172,175 @@ export default function ProgressPage() {
               </div>
 
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 hover:from-pink-600 hover:via-purple-600 hover:to-indigo-600 text-white shadow-lg mt-4 sm:mt-0">
+                <Button 
+                  onClick={handleExportReport}
+                  className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 hover:from-pink-600 hover:via-purple-600 hover:to-indigo-600 text-white shadow-lg mt-4 sm:mt-0"
+                >
                   <Download className="w-4 h-4 mr-2" />
                   Export Report
                 </Button>
               </motion.div>
             </div>
 
-            {/* Progress Overview & Snapshot */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-              >
-                <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-lg">
-                  <CardHeader>
-                    <CardTitle>8-Week Progress Trends</CardTitle>
-                    <CardDescription>Track your improvement over time</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={progressData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="energy"
-                          stroke="#F472B6"
-                          strokeWidth={3}
-                          name="Energy"
-                          activeDot={{ r: 8, fill: '#F472B6' }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="mood"
-                          stroke="#A855F7"
-                          strokeWidth={3}
-                          name="Mood"
-                          activeDot={{ r: 8, fill: '#A855F7' }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="sleep"
-                          stroke="#6366F1"
-                          strokeWidth={3}
-                          name="Sleep"
-                          activeDot={{ r: 8, fill: '#6366F1' }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="stress"
-                          stroke="#EC4899"
-                          strokeWidth={3}
-                          name="Stress"
-                          activeDot={{ r: 8, fill: '#EC4899' }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              </motion.div>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
+                <p className="ml-4 text-gray-600 dark:text-gray-300">Loading your progress data...</p>
+              </div>
+            ) : (
+              <>
+                {/* Summary Stats */}
+                {progressData && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-lg">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Total Exercises</p>
+                            <p className="text-2xl font-bold text-pink-600">{progressData.summary.totalExercises}</p>
+                          </div>
+                          <Activity className="w-8 h-8 text-pink-400" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-lg">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Analyses</p>
+                            <p className="text-2xl font-bold text-purple-600">{progressData.summary.totalAnalyses}</p>
+                          </div>
+                          <TrendingUp className="w-8 h-8 text-purple-400" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-lg">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Periods Tracked</p>
+                            <p className="text-2xl font-bold text-indigo-600">{progressData.summary.totalPeriods}</p>
+                          </div>
+                          <Clock className="w-8 h-8 text-indigo-400" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-lg">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Days Active</p>
+                            <p className="text-2xl font-bold text-pink-600">{progressData.summary.daysActive}</p>
+                          </div>
+                          <Trophy className="w-8 h-8 text-pink-400" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
 
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-              >
-                <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-lg">
-                  <CardHeader>
-                    <CardTitle>Current Health Snapshot</CardTitle>
-                    <CardDescription>Your current balance across key areas</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <RadarChart cx="50%" cy="50%" outerRadius="80%" data={currentWeekData}>
-                        <PolarGrid />
-                        <PolarAngleAxis dataKey="subject" />
-                        <PolarRadiusAxis angle={30} domain={[0, 100]} />
-                        <Radar
-                          name="Current Score"
-                          dataKey="A"
-                          stroke="#A855F7"
-                          fill="#F472B6"
-                          fillOpacity={0.3}
-                          animationDuration={1500}
-                        />
-                        <Tooltip />
-                        <Legend />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </div>
+                {/* Progress Overview & Snapshot */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.6, delay: 0.1 }}
+                  >
+                    <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-lg">
+                      <CardHeader>
+                        <CardTitle>8-Week Progress Trends</CardTitle>
+                        <CardDescription>Track your improvement over time</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {weeklyTrends.length > 0 ? (
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={weeklyTrends}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="date" />
+                              <YAxis />
+                              <Tooltip />
+                              <Legend />
+                              <Line
+                                type="monotone"
+                                dataKey="energy"
+                                stroke="#F472B6"
+                                strokeWidth={3}
+                                name="Energy"
+                                activeDot={{ r: 8, fill: '#F472B6' }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="mood"
+                                stroke="#A855F7"
+                                strokeWidth={3}
+                                name="Mood"
+                                activeDot={{ r: 8, fill: '#A855F7' }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="sleep"
+                                stroke="#6366F1"
+                                strokeWidth={3}
+                                name="Sleep"
+                                activeDot={{ r: 8, fill: '#6366F1' }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="stress"
+                                stroke="#EC4899"
+                                strokeWidth={3}
+                                name="Stress"
+                                activeDot={{ r: 8, fill: '#EC4899' }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex items-center justify-center h-[300px] text-gray-500">
+                            <p>Start tracking your activities to see progress trends!</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.6, delay: 0.2 }}
+                  >
+                    <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-lg">
+                      <CardHeader>
+                        <CardTitle>Current Health Snapshot</CardTitle>
+                        <CardDescription>Your current balance across key areas</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {healthSnapshot.length > 0 ? (
+                          <ResponsiveContainer width="100%" height={300}>
+                            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={healthSnapshot}>
+                              <PolarGrid />
+                              <PolarAngleAxis dataKey="subject" />
+                              <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                              <Radar
+                                name="Current Score"
+                                dataKey="A"
+                                stroke="#A855F7"
+                                fill="#F472B6"
+                                fillOpacity={0.3}
+                                animationDuration={1500}
+                              />
+                              <Tooltip />
+                              <Legend />
+                            </RadarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex items-center justify-center h-[300px] text-gray-500">
+                            <p>Complete more activities to see your health snapshot!</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                </div>
 
             {/* Goals & Achievements */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
@@ -243,23 +358,27 @@ export default function ProgressPage() {
                     <CardDescription>Track your progress towards your health objectives</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {goals.map((goal, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.5, delay: index * 0.1 + 0.4 }}
-                        className="flex flex-col gap-2"
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium text-gray-700 dark:text-gray-200">{goal.title}</span>
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
-                            {goal.current}% / {goal.target}%
-                          </span>
-                        </div>
-                        <Progress value={goal.progress} className="h-2" />
-                      </motion.div>
-                    ))}
+                    {goals.length > 0 ? (
+                      goals.map((goal, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.5, delay: index * 0.1 + 0.4 }}
+                          className="flex flex-col gap-2"
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium text-gray-700 dark:text-gray-200">{goal.title}</span>
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                              {goal.current}% / {goal.target}%
+                            </span>
+                          </div>
+                          <Progress value={goal.progress} className="h-2" />
+                        </motion.div>
+                      ))
+                    ) : (
+                      <p className="text-center text-gray-500 py-8">Start using the app to see your goals!</p>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
@@ -278,25 +397,29 @@ export default function ProgressPage() {
                     <CardDescription>Milestones you've reached on your journey</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {achievements.map((achievement, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.5, delay: index * 0.1 + 0.5 }}
-                        className={`flex items-center p-3 rounded-lg border ${achievement.color} dark:bg-gray-700/50 dark:border-gray-600`}
-                      >
-                        <div className="text-2xl mr-4">{achievement.icon}</div>
-                        <div>
-                          <h3 className="font-semibold text-gray-800 dark:text-white">{achievement.title}</h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-300">{achievement.description}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center">
-                            <Clock className="w-3 h-3 mr-1" />
-                            {achievement.date}
-                          </p>
-                        </div>
-                      </motion.div>
-                    ))}
+                    {achievements.length > 0 ? (
+                      achievements.map((achievement, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.5, delay: index * 0.1 + 0.5 }}
+                          className={`flex items-center p-3 rounded-lg border ${achievement.color} dark:bg-gray-700/50 dark:border-gray-600`}
+                        >
+                          <div className="text-2xl mr-4">{achievement.icon}</div>
+                          <div>
+                            <h3 className="font-semibold text-gray-800 dark:text-white">{achievement.title}</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">{achievement.description}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center">
+                              <Clock className="w-3 h-3 mr-1" />
+                              {achievement.date}
+                            </p>
+                          </div>
+                        </motion.div>
+                      ))
+                    ) : (
+                      <p className="text-center text-gray-500 py-8">Keep using the app to unlock achievements!</p>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
@@ -318,7 +441,10 @@ export default function ProgressPage() {
                 </CardHeader>
                 <CardContent>
                   <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Button className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 hover:from-pink-600 hover:via-purple-600 hover:to-indigo-600 text-white shadow-lg">
+                    <Button 
+                      onClick={() => router.push('/symptom-analyzer')}
+                      className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 hover:from-pink-600 hover:via-purple-600 hover:to-indigo-600 text-white shadow-lg"
+                    >
                       <Search className="w-4 h-4 mr-2" />
                       Go to Symptom Analyzer
                     </Button>
@@ -326,6 +452,8 @@ export default function ProgressPage() {
                 </CardContent>
               </Card>
             </motion.div>
+              </>
+            )}
           </motion.div>
         </div>
       </div>

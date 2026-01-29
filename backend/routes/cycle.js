@@ -1,6 +1,7 @@
 const express = require('express');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
+const { logActivity } = require('../services/activityLogger');
 const router = express.Router();
 
 function requireAuth(req, res, next) {
@@ -92,10 +93,47 @@ router.post('/update', requireAuth, async (req, res) => {
       await Notification.insertMany(notifications);
     }
 
+    // Sync to Google Calendar if enabled
+    let calendarSynced = false;
+    try {
+      const { syncPeriodRemindersToCalendar } = require('../services/calendarService');
+      const calendarResult = await syncPeriodRemindersToCalendar(
+        req.session.userId,
+        nextPeriod,
+        reminderDaysArray
+      );
+      calendarSynced = calendarResult.synced;
+    } catch (error) {
+      console.error('Error syncing to Google Calendar:', error);
+      // Don't fail the request if calendar sync fails
+    }
+
+    // Log activity
+    try {
+      await logActivity({
+        userId: req.session.userId,
+        activityType: 'cycle_info_updated',
+        activityData: {
+          lastPeriodDate: lastPeriodDate,
+          avgCycleLength: avgCycleLength,
+          reminderDays: reminderDays,
+          nextPeriod: nextPeriod,
+          calendarSynced: calendarSynced
+        },
+        metadata: {
+          ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null,
+          userAgent: req.headers['user-agent'] || null
+        }
+      });
+    } catch (error) {
+      console.error('Error logging cycle update activity:', error);
+    }
+
     res.json({ 
       message: 'Cycle info updated', 
       nextPeriod,
-      remindersCreated: notifications.length
+      remindersCreated: notifications.length,
+      calendarSynced: calendarSynced
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to update cycle info', error: err.message });
@@ -130,8 +168,23 @@ router.get('/next', requireAuth, async (req, res) => {
 router.get('/status', requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
-    if (!user || !user.cycleInfo.lastPeriodDate || !user.cycleInfo.avgCycleLength) {
-      return res.status(400).json({ message: 'Cycle info incomplete' });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Handle case where cycle info is not set up yet
+    if (!user.cycleInfo || !user.cycleInfo.lastPeriodDate || !user.cycleInfo.avgCycleLength) {
+      return res.json({
+        nextPeriod: null,
+        daysUntilNext: null,
+        isOverdue: false,
+        cyclePhase: 'unknown',
+        upcomingReminders: [],
+        cycleHistory: [],
+        reminderDays: user.cycleInfo?.reminderDays || [3, 1],
+        lastPeriodDate: null,
+        avgCycleLength: user.cycleInfo?.avgCycleLength || 28
+      });
     }
 
     const nextPeriod = predictNextPeriod(user.cycleInfo.cycleHistory, user.cycleInfo.avgCycleLength) ||
@@ -155,7 +208,9 @@ router.get('/status', requireAuth, async (req, res) => {
       cyclePhase,
       upcomingReminders,
       cycleHistory: user.cycleInfo.cycleHistory || [],
-      reminderDays: user.cycleInfo.reminderDays || [3, 1]
+      reminderDays: user.cycleInfo.reminderDays || [3, 1],
+      lastPeriodDate: user.cycleInfo.lastPeriodDate,
+      avgCycleLength: user.cycleInfo.avgCycleLength
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to get cycle status', error: err.message });
@@ -238,12 +293,53 @@ router.post('/start-period', requireAuth, async (req, res) => {
       await Notification.insertMany(notifications);
     }
 
+    // Sync to Google Calendar if enabled
+    let calendarSynced = false;
+    if (nextPeriod) {
+      try {
+        const { syncPeriodRemindersToCalendar } = require('../services/calendarService');
+        const calendarResult = await syncPeriodRemindersToCalendar(
+          req.session.userId,
+          nextPeriod,
+          reminderDays
+        );
+        calendarSynced = calendarResult.synced;
+      } catch (error) {
+        console.error('Error syncing to Google Calendar:', error);
+        // Don't fail the request if calendar sync fails
+      }
+    }
+
+    // Log activity
+    try {
+      await logActivity({
+        userId: req.session.userId,
+        activityType: 'period_added',
+        activityData: {
+          startDate: startDate,
+          cycleLength: cycleLength,
+          avgCycleLength: newAvgCycleLength,
+          nextPeriod: nextPeriod,
+          totalPeriods: cycleHistory.length,
+          calendarSynced: calendarSynced
+        },
+        metadata: {
+          ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null,
+          userAgent: req.headers['user-agent'] || null
+        },
+        relatedEntityType: 'PeriodRecord'
+      });
+    } catch (error) {
+      console.error('Error logging period activity:', error);
+    }
+
     res.json({
       message: 'Period started successfully',
       nextPeriod,
       cycleLength,
       newAvgCycleLength,
-      remindersCreated: notifications.length
+      remindersCreated: notifications.length,
+      calendarSynced: calendarSynced
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to start period', error: err.message });
@@ -263,5 +359,76 @@ function getCyclePhase(lastPeriodDate, avgCycleLength) {
   if (cycleDay <= 28) return 'luteal';
   return 'premenstrual';
 }
+
+// GET /api/cycle/history
+router.get('/history', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.session.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const cycleHistory = user.cycleInfo?.cycleHistory || [];
+    const lastPeriodDate = user.cycleInfo?.lastPeriodDate || null;
+    const avgCycleLength = user.cycleInfo?.avgCycleLength || 28;
+
+    // Get symptom analyses if they exist
+    let symptomAnalyses = [];
+    try {
+      const SymptomAnalysis = require('../models/SymptomAnalysis');
+      symptomAnalyses = await SymptomAnalysis.find({ userId: req.session.userId })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean();
+    } catch (err) {
+      console.error('Error fetching symptom analyses:', err);
+    }
+
+    // Get exercise logs if they exist
+    let exerciseLogs = [];
+    try {
+      const ExerciseLog = require('../models/ExerciseLog');
+      exerciseLogs = await ExerciseLog.find({ userId: req.session.userId })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean();
+    } catch (err) {
+      console.error('Error fetching exercise logs:', err);
+    }
+
+    res.json({
+      success: true,
+      periodHistory: cycleHistory.map(cycle => ({
+        startDate: cycle.startDate,
+        length: cycle.length,
+        recordedAt: cycle.recordedAt
+      })),
+      lastPeriodDate,
+      avgCycleLength,
+      symptomAnalyses: symptomAnalyses.map(analysis => ({
+        id: analysis._id,
+        symptoms: analysis.symptoms,
+        createdAt: analysis.createdAt,
+        aiInsights: analysis.aiInsights
+      })),
+      exerciseLogs: exerciseLogs.map(log => ({
+        id: log._id,
+        exerciseName: log.exerciseName,
+        duration: log.duration,
+        createdAt: log.createdAt
+      })),
+      totalPeriods: cycleHistory.length,
+      totalAnalyses: symptomAnalyses.length,
+      totalExercises: exerciseLogs.length
+    });
+  } catch (err) {
+    console.error('Error fetching health history:', err);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch health history', 
+      error: err.message 
+    });
+  }
+});
 
 module.exports = router; 

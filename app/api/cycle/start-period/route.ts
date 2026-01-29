@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
     const body = await request.json()
     
-    const response = await fetch(`${process.env.BACKEND_URL}/api/cycle/start-period`, {
+    const response = await fetch(`${backendUrl}/api/cycle/start-period`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'Cookie': request.headers.get('cookie') || '',

@@ -2,6 +2,7 @@ const express = require('express');
 const { generateExercisePlan } = require('../utils/ai');
 const ExercisePlan = require('../models/ExercisePlan');
 const ExerciseLog = require('../models/ExerciseLog');
+const { logActivity } = require('../services/activityLogger');
 
 const router = express.Router();
 
@@ -22,6 +23,28 @@ router.post('/plan', requireAuth, async (req, res) => {
       { plan },
       { upsert: true, new: true }
     );
+
+    // Log activity
+    try {
+      await logActivity({
+        userId: req.session.userId,
+        activityType: 'exercise_plan_created',
+        activityData: {
+          goals: goals,
+          hasPlan: !!saved.plan,
+          planExercisesCount: saved.plan?.exercises?.length || 0
+        },
+        metadata: {
+          ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null,
+          userAgent: req.headers['user-agent'] || null
+        },
+        relatedEntityId: saved._id,
+        relatedEntityType: 'ExercisePlan'
+      });
+    } catch (error) {
+      console.error('Error logging exercise plan activity:', error);
+    }
+
     res.json({ plan: saved.plan });
   } catch (err) {
     res.status(500).json({ message: 'Failed to generate plan', error: err.message });
@@ -52,6 +75,28 @@ router.post('/log', requireAuth, async (req, res) => {
       duration,
       date,
     });
+
+    // Log activity
+    try {
+      await logActivity({
+        userId: req.session.userId,
+        activityType: 'exercise_logged',
+        activityData: {
+          exerciseName: exerciseName,
+          duration: duration,
+          date: date
+        },
+        metadata: {
+          ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null,
+          userAgent: req.headers['user-agent'] || null
+        },
+        relatedEntityId: log._id,
+        relatedEntityType: 'ExerciseLog'
+      });
+    } catch (error) {
+      console.error('Error logging exercise activity:', error);
+    }
+
     res.status(201).json({ message: 'Exercise logged', log });
   } catch (err) {
     res.status(500).json({ message: 'Failed to log exercise', error: err.message });

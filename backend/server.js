@@ -38,7 +38,15 @@ app.use(session({
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/analyze', require('./routes/analyze'));
+app.use('/api/exercise', require('./routes/exercise'));
+app.use('/api/cycle', require('./routes/cycle'));
 app.use('/api/report', require('./routes/report'));
+app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/preferences', require('./routes/preferences'));
+app.use('/api/activity', require('./routes/activity'));
+app.use('/api/progress', require('./routes/progress'));
+app.use('/api/calendar', require('./routes/calendar'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

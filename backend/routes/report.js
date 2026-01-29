@@ -5,6 +5,7 @@ const SymptomAnalysis = require('../models/SymptomAnalysis');
 const ExercisePlan = require('../models/ExercisePlan');
 const ExerciseLog = require('../models/ExerciseLog');
 const { analyzeWithGemini } = require('../utils/ai');
+const { logActivity } = require('../services/activityLogger');
 
 const router = express.Router();
 
@@ -125,6 +126,21 @@ router.get('/progress-pdf', requireAuth, async (req, res) => {
       aiInsights: aiResponse,
       generatedDate: new Date()
     });
+
+    // Log activity (non-blocking, don't wait for it)
+    logActivity({
+      userId: req.session.userId,
+      activityType: 'report_downloaded',
+      activityData: {
+        reportType: 'progress',
+        exerciseSessions: totalSessions,
+        totalDuration: totalDuration
+      },
+      metadata: {
+        ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null,
+        userAgent: req.headers['user-agent'] || null
+      }
+    }).catch(err => console.error('Error logging report download:', err));
 
     // Finalize PDF
     doc.end();
@@ -268,6 +284,21 @@ router.get('/pdf', requireAuth, async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="health_report.pdf"');
     doc.pipe(res);
+
+    // Log activity (non-blocking, don't wait for it)
+    logActivity({
+      userId: req.session.userId,
+      activityType: 'report_downloaded',
+      activityData: {
+        reportType: 'health',
+        hasAnalysis: !!latestAnalysis,
+        hasExercisePlan: !!exercisePlan
+      },
+      metadata: {
+        ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null,
+        userAgent: req.headers['user-agent'] || null
+      }
+    }).catch(err => console.error('Error logging report download:', err));
 
     doc.fontSize(22).text('Sync Hormonal Health Report', { align: 'center' });
     doc.moveDown();

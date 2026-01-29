@@ -1,5 +1,6 @@
 const express = require('express');
 const User = require('../models/User');
+const { logActivity } = require('../services/activityLogger');
 const router = express.Router();
 
 function requireAuth(req, res, next) {
@@ -37,6 +38,25 @@ router.post('/', requireAuth, async (req, res) => {
 
     const user = await User.findByIdAndUpdate(req.session.userId, update, { new: true }).select('reminderDays notificationHour');
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Log activity
+    try {
+      await logActivity({
+        userId: req.session.userId,
+        activityType: 'preferences_updated',
+        activityData: {
+          reminderDays: user.reminderDays,
+          notificationHour: user.notificationHour
+        },
+        metadata: {
+          ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null,
+          userAgent: req.headers['user-agent'] || null
+        }
+      });
+    } catch (error) {
+      console.error('Error logging preferences activity:', error);
+    }
+
     res.json({
       message: 'Preferences updated',
       reminderDays: user.reminderDays,

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const res = await fetch(`${process.env.BACKEND_URL || ''}/api/preferences`, {
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+    const res = await fetch(`${backendUrl}/api/preferences`, {
       headers: { Cookie: request.headers.get('cookie') || '' },
       credentials: 'include',
     })
@@ -15,8 +16,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
     const body = await request.json()
-    const res = await fetch(`${process.env.BACKEND_URL || ''}/api/preferences`, {
+    const res = await fetch(`${backendUrl}/api/preferences`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

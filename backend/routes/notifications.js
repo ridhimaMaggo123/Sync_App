@@ -1,6 +1,7 @@
 const express = require('express');
 const Notification = require('../models/Notification');
 const NotificationService = require('../utils/notificationService');
+const { logActivity } = require('../services/activityLogger');
 const router = express.Router();
 
 function requireAuth(req, res, next) {
@@ -14,6 +15,20 @@ function requireAuth(req, res, next) {
 router.get('/', requireAuth, async (req, res) => {
   try {
     const notifications = await NotificationService.getUserNotifications(req.session.userId, 20);
+    
+    // Log activity (non-blocking)
+    logActivity({
+      userId: req.session.userId,
+      activityType: 'notification_viewed',
+      activityData: {
+        notificationCount: notifications.length
+      },
+      metadata: {
+        ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null,
+        userAgent: req.headers['user-agent'] || null
+      }
+    }).catch(err => console.error('Error logging notification view:', err));
+    
     res.json(notifications);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch notifications', error: err.message });

@@ -1,6 +1,8 @@
 const express = require('express');
 const User = require('../models/User');
+const LoginHistory = require('../models/LoginHistory');
 const { requireAuth, requireGuest } = require('../middleware/authMiddleware');
+const { logActivity } = require('../services/activityLogger');
 const router = express.Router();
 
 // POST /api/auth/register
@@ -114,6 +116,54 @@ router.post('/login', requireGuest, async (req, res) => {
     req.session.userId = user._id;
     req.session.user = user.toJSON();
 
+    // Record login history and activity
+    try {
+      const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'Unknown';
+      const userAgent = req.headers['user-agent'] || 'Unknown';
+      
+      // Save to LoginHistory collection
+      await LoginHistory.create({
+        userId: user._id,
+        loginDate: new Date(),
+        ipAddress: ipAddress,
+        userAgent: userAgent
+      });
+
+      // Log activity
+      await logActivity({
+        userId: user._id,
+        activityType: 'login',
+        activityData: {
+          loginMethod: 'email',
+          sessionId: req.sessionID
+        },
+        metadata: {
+          ipAddress: ipAddress,
+          userAgent: userAgent
+        }
+      });
+
+      // Sync to Google Calendar on login if enabled and cycle data exists
+      if (user.googleCalendar?.enabled && user.cycleInfo?.lastPeriodDate && user.cycleInfo?.avgCycleLength) {
+        try {
+          const { syncPeriodRemindersToCalendar } = require('../services/calendarService');
+          const cycleHistory = user.cycleInfo.cycleHistory || [];
+          const lastPeriodDate = new Date(user.cycleInfo.lastPeriodDate);
+          const avgCycleLength = user.cycleInfo.avgCycleLength;
+          const nextPeriodDate = new Date(lastPeriodDate.getTime() + avgCycleLength * 24 * 60 * 60 * 1000);
+          const reminderDays = user.cycleInfo.reminderDays || [3, 1];
+          
+          await syncPeriodRemindersToCalendar(user._id, nextPeriodDate, reminderDays);
+        } catch (error) {
+          console.error('Error syncing calendar on login:', error);
+          // Don't fail login if calendar sync fails
+        }
+      }
+    } catch (error) {
+      console.error('Error saving login history:', error);
+      // Don't fail login if history logging fails
+    }
+
     // Create quick login notification
     try {
       const Notification = require('../models/Notification');
@@ -143,7 +193,26 @@ router.post('/login', requireGuest, async (req, res) => {
 });
 
 // GET /api/auth/logout
-router.get('/logout', requireAuth, (req, res) => {
+router.get('/logout', requireAuth, async (req, res) => {
+  const userId = req.session.userId;
+  
+  // Log logout activity before destroying session
+  try {
+    await logActivity({
+      userId: userId,
+      activityType: 'logout',
+      activityData: {
+        sessionId: req.sessionID
+      },
+      metadata: {
+        ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || null,
+        userAgent: req.headers['user-agent'] || null
+      }
+    });
+  } catch (error) {
+    console.error('Error logging logout activity:', error);
+  }
+
   req.session.destroy((err) => {
     if (err) {
       return res.status(500).json({
@@ -192,6 +261,37 @@ router.get('/status', (req, res) => {
     isAuthenticated: !!req.session.userId,
     user: req.session.user || null
   });
+});
+
+// GET /api/auth/login-history
+router.get('/login-history', requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const limit = parseInt(req.query.limit) || 50; // Default to last 50 logins
+    const skip = parseInt(req.query.skip) || 0;
+
+    const loginHistory = await LoginHistory.find({ userId })
+      .sort({ loginDate: -1 }) // Most recent first
+      .limit(limit)
+      .skip(skip)
+      .select('loginDate ipAddress userAgent')
+      .lean();
+
+    const totalLogins = await LoginHistory.countDocuments({ userId });
+
+    res.json({
+      success: true,
+      loginHistory,
+      totalLogins,
+      hasMore: totalLogins > skip + limit
+    });
+  } catch (error) {
+    console.error('Error fetching login history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching login history'
+    });
+  }
 });
 
 module.exports = router; 

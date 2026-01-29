@@ -26,7 +26,8 @@ import {
   BookOpen,
   MoreHorizontal,
   Watch,
-} from "lucide-react" // Added Heart and Zap icons
+  History,
+} from "lucide-react" // Added Heart, Zap, and History icons
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 import { useCurrentUser } from "@/hooks/use-current-user"
@@ -39,11 +40,13 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 const navItems = [
+  { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/symptom-analyzer", label: "Analyzer", icon: Search },
   { href: "/symptoms", label: "Symptoms", icon: Activity },
   { href: "/period-tracker", label: "Period", icon: Calendar },
   { href: "/insights", label: "Insights", icon: BookOpen },
   { href: "/progress", label: "Progress", icon: TrendingUp },
+  { href: "/history", label: "History", icon: Heart },
   { href: "/phases", label: "Phases", icon: Waves },
   { href: "/remedies", label: "Remedies", icon: Leaf },
   { href: "/exercises", label: "Exercises", icon: Activity },
@@ -56,11 +59,13 @@ const navItems = [
 
 // Keep the most common actions visible; move others into a compact dropdown
 const visibleHrefs = new Set([
+  "/dashboard",
   "/symptom-analyzer",
   "/symptoms",
   "/period-tracker",
   "/insights",
   "/progress",
+  "/history",
 ])
 const visibleNav = navItems.filter(n => visibleHrefs.has(n.href))
 const moreNav = navItems.filter(n => !visibleHrefs.has(n.href))

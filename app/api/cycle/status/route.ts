@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const response = await fetch(`${process.env.BACKEND_URL}/api/cycle/status`, {
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+    const response = await fetch(`${backendUrl}/api/cycle/status`, {
       credentials: 'include',
       headers: {
         'Cookie': request.headers.get('cookie') || '',

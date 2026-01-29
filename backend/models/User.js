@@ -33,6 +33,84 @@ const userSchema = new mongoose.Schema({
     max: 23,
     default: 9
   },
+  cycleInfo: {
+    lastPeriodDate: {
+      type: Date,
+      default: null
+    },
+    avgCycleLength: {
+      type: Number,
+      default: 28,
+      min: 21,
+      max: 45
+    },
+    cycleHistory: [{
+      startDate: {
+        type: Date,
+        required: true
+      },
+      length: {
+        type: Number,
+        default: null
+      },
+      recordedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    reminderDays: {
+      type: [Number],
+      default: [3, 1]
+    },
+    notificationEnabled: {
+      type: Boolean,
+      default: true
+    }
+  },
+  // Google Calendar integration
+  googleCalendar: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    accessToken: {
+      type: String,
+      default: null,
+      select: false // Don't return in queries by default for security
+    },
+    refreshToken: {
+      type: String,
+      default: null,
+      select: false // Don't return in queries by default for security
+    },
+    tokenExpiry: {
+      type: Date,
+      default: null
+    },
+    calendarId: {
+      type: String,
+      default: 'primary' // Use primary calendar by default
+    },
+    eventIds: [{
+      eventId: {
+        type: String,
+        required: true
+      },
+      eventType: {
+        type: String,
+        enum: ['period_start', 'period_reminder', 'fertility_window'],
+        required: true
+      },
+      date: {
+        type: Date,
+        required: true
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now
+      }
+    }]
+  },
   createdAt: {
     type: Date,
     default: Date.now
