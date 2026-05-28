@@ -96,23 +96,53 @@ const FloatingElement = ({ children, delay = 0 }: { children: React.ReactNode; d
 )
 
 export default function Home() {
-  const [showSplash, setShowSplash] = useState(true)
+  const [showSplash, setShowSplash] = useState(false)
   const [hoveredFeature, setHoveredFeature] = useState<number | null>(null)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  const [orbStyles, setOrbStyles] = useState<
+    { width: number; height: number; left: string; top: string; deltaX: number; deltaY: number; duration: number }[]
+  >([])
   const router = useRouter()
   const { scrollY } = useScroll()
   const y1 = useTransform(scrollY, [0, 300], [0, 50])
   const y2 = useTransform(scrollY, [0, 300], [0, -50])
 
   useEffect(() => {
+    try {
+      const splashSeen = sessionStorage.getItem("sync_splash_seen")
+      if (!splashSeen) {
+        setShowSplash(true)
+      }
+    } catch {
+      // Ignore storage errors and continue without splash.
+    }
+
     const handleMouseMove = (e: MouseEvent) => {
       setMousePosition({ x: e.clientX, y: e.clientY })
     }
+
+    setOrbStyles(
+      [...Array(8)].map(() => ({
+        width: Math.random() * 300 + 100,
+        height: Math.random() * 300 + 100,
+        left: `${Math.random() * 100}%`,
+        top: `${Math.random() * 100}%`,
+        deltaX: Math.random() * 100 - 50,
+        deltaY: Math.random() * 100 - 50,
+        duration: Math.random() * 10 + 10,
+      }))
+    )
+
     window.addEventListener("mousemove", handleMouseMove)
     return () => window.removeEventListener("mousemove", handleMouseMove)
   }, [])
 
   const handleSplashComplete = () => {
+    try {
+      sessionStorage.setItem("sync_splash_seen", "1")
+    } catch {
+      // Ignore storage errors.
+    }
     setShowSplash(false)
   }
 
@@ -131,23 +161,23 @@ export default function Home() {
             {/* Animated Background Elements */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
               {/* Floating Orbs */}
-              {[...Array(8)].map((_, i) => (
+              {orbStyles.map((orb, i) => (
                 <motion.div
                   key={i}
                   className="absolute rounded-full bg-gradient-to-r from-pink-300/20 via-purple-300/20 to-indigo-300/20 blur-xl"
                   style={{
-                    width: Math.random() * 300 + 100,
-                    height: Math.random() * 300 + 100,
-                    left: `${Math.random() * 100}%`,
-                    top: `${Math.random() * 100}%`,
+                    width: orb.width,
+                    height: orb.height,
+                    left: orb.left,
+                    top: orb.top,
                   }}
                   animate={{
-                    x: [0, Math.random() * 100 - 50],
-                    y: [0, Math.random() * 100 - 50],
+                    x: [0, orb.deltaX],
+                    y: [0, orb.deltaY],
                     scale: [1, 1.2, 1],
                   }}
                   transition={{
-                    duration: Math.random() * 10 + 10,
+                    duration: orb.duration,
                     repeat: Number.POSITIVE_INFINITY,
                     repeatType: "reverse",
                   }}

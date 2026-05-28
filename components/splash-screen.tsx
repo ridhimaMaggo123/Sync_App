@@ -13,9 +13,9 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
   const [showParticles, setShowParticles] = useState(false)
 
   useEffect(() => {
-    const timer1 = setTimeout(() => setShowTagline(true), 300)
-    const timer2 = setTimeout(() => setShowParticles(true), 150)
-    const timer3 = setTimeout(() => onComplete(), 1600)
+    const timer1 = setTimeout(() => setShowTagline(true), 120)
+    const timer2 = setTimeout(() => setShowParticles(true), 80)
+    const timer3 = setTimeout(() => onComplete(), 700)
 
     return () => {
       clearTimeout(timer1)

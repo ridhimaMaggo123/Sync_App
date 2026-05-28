@@ -15,9 +15,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts"
 import WellnessNavbar from "@/components/wellness-navbar"
 import { useCurrentUser } from "@/hooks/use-current-user"
@@ -407,7 +404,7 @@ export default function Dashboard() {
                               <div>
                                 <p className="text-sm font-medium">
                                   {activityType
-                                    ? activityType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                                    ? activityType.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
                                     : 'Unknown Activity'}
                                 </p>
                                 <p className="text-xs text-gray-500">

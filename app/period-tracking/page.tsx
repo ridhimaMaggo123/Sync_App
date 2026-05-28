@@ -267,8 +267,8 @@ export default function PeriodTrackingPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {cycleData?.upcomingReminders?.length > 0 ? (
-                    cycleData.upcomingReminders.map((reminder, index) => (
+                  {(cycleData?.upcomingReminders ?? []).length > 0 ? (
+                    (cycleData?.upcomingReminders ?? []).map((reminder, index) => (
                       <motion.div 
                         key={index} 
                         initial={{ opacity: 0, y: 10 }}
@@ -298,7 +298,7 @@ export default function PeriodTrackingPage() {
         </div>
 
         {/* Cycle History */}
-        {cycleData?.cycleHistory?.length > 0 && (
+        {(cycleData?.cycleHistory ?? []).length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -317,7 +317,7 @@ export default function PeriodTrackingPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {cycleData.cycleHistory.slice(-6).reverse().map((cycle, index) => (
+                  {(cycleData?.cycleHistory ?? []).slice(-6).reverse().map((cycle, index) => (
                     <motion.div 
                       key={index} 
                       initial={{ opacity: 0, scale: 0.9 }}

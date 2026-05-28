@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { AlertCircle, CheckCircle, Download, Brain, FileText, TrendingUp, Calendar, Sparkles, Heart, Flower, History, X } from "lucide-react"
-import jsPDF from 'jspdf'
 import WellnessNavbar from "@/components/wellness-navbar"
 
 interface AnalysisResult {
@@ -241,6 +240,7 @@ export default function SymptomAnalyzer() {
     
     setIsDownloading(true)
     try {
+      const { default: jsPDF } = await import('jspdf')
       const doc = new jsPDF()
       
       // Ensure we have all required data
@@ -249,12 +249,12 @@ export default function SymptomAnalyzer() {
       }
       
       // Professional color palette
-      const primaryColor = [244, 114, 182] // Pink-400
-      const secondaryColor = [168, 85, 247] // Purple-500
-      const accentColor = [99, 102, 241] // Indigo-500
-      const darkColor = [31, 41, 55] // Gray-800
-      const lightGray = [107, 114, 128] // Gray-500
-      const backgroundColor = [249, 250, 251] // Gray-50
+      const primaryColor: [number, number, number] = [244, 114, 182] // Pink-400
+      const secondaryColor: [number, number, number] = [168, 85, 247] // Purple-500
+      const accentColor: [number, number, number] = [99, 102, 241] // Indigo-500
+      const darkColor: [number, number, number] = [31, 41, 55] // Gray-800
+      const lightGray: [number, number, number] = [107, 114, 128] // Gray-500
+      const backgroundColor: [number, number, number] = [249, 250, 251] // Gray-50
       
       // Add background color
       doc.setFillColor(...backgroundColor)
@@ -333,7 +333,7 @@ export default function SymptomAnalyzer() {
       doc.text('⚠️ RISK ASSESSMENT', 20, yPos)
       
       yPos += 15
-      const riskColors = {
+      const riskColors: Record<string, [number, number, number]> = {
         low: [34, 197, 94],
         medium: [245, 158, 11],
         high: [239, 68, 68]

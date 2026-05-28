@@ -7,8 +7,7 @@ const connectDB = require('./config/db');
 
 const app = express();
 
-// Connect to MongoDB
-connectDB();
+let isDatabaseConnected = false;
 
 // Middleware
 app.use(cors({ 
@@ -19,22 +18,29 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Session configuration
-app.use(session({
+const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'sync_secret_key_2024',
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({
-    mongoUrl: process.env.MONGO_URI,
-    collectionName: 'sessions',
-    ttl: 24 * 60 * 60, // 1 day
-  }),
   cookie: {
     httpOnly: true,
     maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
   },
-}));
+};
+
+if (isDatabaseConnected) {
+  sessionConfig.store = MongoStore.create({
+    mongoUrl: process.env.MONGO_URI,
+    collectionName: 'sessions',
+    ttl: 24 * 60 * 60, // 1 day
+  });
+} else {
+  console.warn('⚠️ Using in-memory sessions because MongoDB is not connected.');
+}
+
+app.use(session(sessionConfig));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -76,9 +82,16 @@ app.use('*', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📱 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
-  console.log(`🗄️  Database: MongoDB Atlas`);
-  console.log(`🔐 Session Secret: ${process.env.SESSION_SECRET ? 'Configured' : 'Using default'}`);
-});
+const startServer = async () => {
+  // Connect to MongoDB before wiring storage that depends on it
+  isDatabaseConnected = await connectDB();
+
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📱 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+    console.log(`🗄️  Database: ${isDatabaseConnected ? 'MongoDB Atlas (Connected)' : 'MongoDB Atlas (Disconnected)'}`);
+    console.log(`🔐 Session Secret: ${process.env.SESSION_SECRET ? 'Configured' : 'Using default'}`);
+  });
+};
+
+startServer();

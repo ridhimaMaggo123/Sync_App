@@ -46,7 +46,13 @@ export default function SignInPage() {
         body,
       });
       
-      const data = await res.json();
+      const raw = await res.text();
+      let data: { message?: string } = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        data = {};
+      }
       
       if (res.ok) {
         setMessage({ 
@@ -70,10 +76,16 @@ export default function SignInPage() {
           }, 1000);
         }
       } else {
-        setMessage({ type: "error", text: data.message || "Authentication failed." });
+        const fallbackMessage = res.status === 503
+          ? "Database is unavailable right now. Please try again shortly."
+          : "Authentication failed.";
+        setMessage({ type: "error", text: data.message || fallbackMessage });
       }
     } catch (err) {
-      setMessage({ type: "error", text: "Network error. Please try again." });
+      setMessage({
+        type: "error",
+        text: "Cannot reach login server. Make sure backend is running on port 5000.",
+      });
     }
     setIsSubmitting(false);
   };

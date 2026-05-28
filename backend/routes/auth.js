@@ -1,12 +1,23 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const LoginHistory = require('../models/LoginHistory');
 const { requireAuth, requireGuest } = require('../middleware/authMiddleware');
 const { logActivity } = require('../services/activityLogger');
 const router = express.Router();
 
+const requireDatabase = (_req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      message: 'Database is temporarily unavailable. Please try again in a moment.',
+    });
+  }
+  next();
+};
+
 // POST /api/auth/register
-router.post('/register', requireGuest, async (req, res) => {
+router.post('/register', requireDatabase, requireGuest, async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
@@ -74,7 +85,7 @@ router.post('/register', requireGuest, async (req, res) => {
 });
 
 // Alias: POST /api/auth/signup -> behaves like /register
-router.post('/signup', requireGuest, async (req, res, next) => {
+router.post('/signup', requireDatabase, requireGuest, async (req, res, next) => {
   // Delegate to the same logic as /register by reusing the handler
   // We simply call the next route handler by resetting the url to /register
   req.url = '/register';
@@ -82,7 +93,7 @@ router.post('/signup', requireGuest, async (req, res, next) => {
 });
 
 // POST /api/auth/login
-router.post('/login', requireGuest, async (req, res) => {
+router.post('/login', requireDatabase, requireGuest, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -230,7 +241,7 @@ router.get('/logout', requireAuth, async (req, res) => {
 });
 
 // GET /api/auth/me
-router.get('/me', requireAuth, async (req, res) => {
+router.get('/me', requireDatabase, requireAuth, async (req, res) => {
   try {
     const user = await User.findById(req.session.userId);
     if (!user) {
@@ -264,7 +275,7 @@ router.get('/status', (req, res) => {
 });
 
 // GET /api/auth/login-history
-router.get('/login-history', requireAuth, async (req, res) => {
+router.get('/login-history', requireDatabase, requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
     const limit = parseInt(req.query.limit) || 50; // Default to last 50 logins

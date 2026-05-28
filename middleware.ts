@@ -7,7 +7,7 @@ const PUBLIC_PATHS = new Set([
 ])
 
 export async function middleware(request: NextRequest) {
-  const { pathname, origin } = request.nextUrl
+  const { pathname } = request.nextUrl
 
   // Allow Next internals and static files
   if (
@@ -25,34 +25,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Check auth status by calling backend via the same origin (rewritten to Express)
-  try {
-    const statusResponse = await fetch(`${origin}/api/auth/status`, {
-      headers: { Cookie: request.headers.get('cookie') || '' },
-      credentials: 'include',
-    })
-
-    if (!statusResponse.ok) {
-      const url = new URL('/signin', request.url)
-      url.searchParams.set('redirect', pathname)
-      return NextResponse.redirect(url)
-    }
-
-    const data = await statusResponse.json()
-    const isAuthenticated = !!data?.isAuthenticated
-
-    if (!isAuthenticated) {
-      const url = new URL('/signin', request.url)
-      url.searchParams.set('redirect', pathname)
-      return NextResponse.redirect(url)
-    }
-
-    return NextResponse.next()
-  } catch (_error) {
-    const url = new URL('/signin', request.url)
-    url.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(url)
-  }
+  // All app pages are accessible without sign-in.
+  return NextResponse.next()
 }
 
 export const config = {

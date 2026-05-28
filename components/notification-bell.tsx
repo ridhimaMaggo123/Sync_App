@@ -15,31 +15,59 @@ interface Notification {
   priority: string
 }
 
+let cachedNotifications: Notification[] | null = null
+let cachedAt = 0
+const NOTIFICATION_CACHE_TTL_MS = 30_000
+
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetchNotifications()
-    const id = setInterval(fetchNotifications, 60_000)
-    return () => clearInterval(id)
-  }, [])
+    const now = Date.now()
+    if (cachedNotifications && now - cachedAt < NOTIFICATION_CACHE_TTL_MS) {
+      setNotifications(cachedNotifications)
+    } else {
+      fetchNotifications({ silent: true })
+    }
 
-  const fetchNotifications = async () => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchNotifications({ silent: true })
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      // Keep unread count fresh, but avoid unnecessary work when popover is closed.
+      fetchNotifications({ silent: !isOpen })
+    }, isOpen ? 30_000 : 120_000)
+
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [isOpen])
+
+  const fetchNotifications = async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       const response = await fetch('/api/notifications', {
         credentials: 'include'
       })
       if (response.ok) {
         const data = await response.json()
         setNotifications(data)
+        cachedNotifications = data
+        cachedAt = Date.now()
       }
     } catch (error) {
       console.error('Error fetching notifications:', error)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
