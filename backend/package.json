@@ -29,5 +29,8 @@
     "health-app"
   ],
   "author": "Sync Health Team",
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=20 <23"
+  }
 }
